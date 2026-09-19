@@ -22,6 +22,15 @@ describe('Session', () => {
     expect(surface).toBe(session.surface)
   })
 
+  it('persists the ignorable marker only for log-only appends that ask for it', () => {
+    const session = Session.create(SessionId('log-only-marker'))
+    session.append('turn/start', { turn: 1 }, { ignorable: true })
+    session.append('turn/start', { turn: 2 })
+    const [marked, plain] = session.snapshotEvents()
+    expect(marked).toMatchObject({ type: 'turn/start', ignorable: true })
+    expect(plain.ignorable).toBeUndefined()
+  })
+
   it('derives message history from the event log', () => {
     const session = Session.create(SessionId('s1'))
     session.append('turn/start', { turn: 1 })

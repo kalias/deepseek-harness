@@ -454,6 +454,15 @@ export type SurfaceIntent<T extends SurfaceEventType = SurfaceEventType> = {
   sourceEventSeqs?: SessionSeq[]
 })
 
+/** Options for appending one purely informational, plugin-owned log record. */
+export interface LogOnlyEventIntent {
+  /**
+   * Marks the stored event a reader may skip when it does not recognize the type;
+   * without it an out-of-repo event type refuses session reconstruction.
+   */
+  readonly ignorable?: true
+}
+
 /**
  * One immutable entry in the session log.
  *
