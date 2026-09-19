@@ -6,6 +6,9 @@
  * @module
  */
 
+import type { Context } from '@deepseek-ai/cordis'
+import { credentialRef } from '@deepseek-ai/dsh-credentials'
+import { launchEnvironmentOf } from '@deepseek-ai/dsh-launch-environment'
 import type { Transport } from '@modelcontextprotocol/client'
 import { StdioClientTransport } from '@modelcontextprotocol/client/stdio'
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/client'
@@ -43,4 +46,30 @@ export function createTransport(config: Config): Transport {
         { requestInit: { headers: config.headers } },
       )
   }
+}
+
+/** Create a transport after resolving optional credential-backed HTTP headers. */
+export async function createTransportForContext(ctx: Context, config: Config): Promise<Transport> {
+  if (config.transport !== 'streamable-http' || Object.keys(config.credentialHeaders ?? {}).length === 0) {
+    return createTransport(config)
+  }
+  return createTransport({ ...config, headers: await resolveHttpHeaders(ctx, config) })
+}
+
+/** Resolve literal and credential-backed HTTP headers without retaining a secret. */
+async function resolveHttpHeaders(ctx: Context, config: Extract<Config, { transport: 'streamable-http' }>): Promise<Record<string, string>> {
+  const headers = { ...config.headers }
+  const credentials = ctx.get('credentials')
+  const environment = launchEnvironmentOf(ctx)
+  for (const [header, binding] of Object.entries(config.credentialHeaders ?? {})) {
+    const ref = credentialRef(binding.ref)
+    const resolved = credentials === undefined
+      ? environment.get(ref)
+      : await credentials.resolve(ref)
+    if (resolved === undefined || resolved.value.length === 0) {
+      throw new Error(`mcp-client(${config.serverName}): HTTP header ${JSON.stringify(header)} requires credential reference ${JSON.stringify(ref)}.`)
+    }
+    headers[header] = `${binding.prefix ?? ''}${resolved.value}`
+  }
+  return headers
 }
